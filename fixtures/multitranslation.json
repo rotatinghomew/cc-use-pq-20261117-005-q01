@@ -1,0 +1,168 @@
+{
+  "batch": {
+    "batch_id": "multitranslation-v1",
+    "stories": [
+      {
+        "story_id": "three-travelers-coast",
+        "revision": 1,
+        "title": "海岸抄本：三位旅人",
+        "tradition": "coastal_copy",
+        "source": {"reference": "本地合成转写：海岸抄本（第 1 页）", "kind": "local_synthetic"},
+        "characters": [
+          {"character_id": "c1", "name": "阿甲", "sibling_order": 1},
+          {"character_id": "c2", "name": "阿乙", "sibling_order": 2},
+          {"character_id": "c3", "name": "阿丙", "sibling_order": 3}
+        ],
+        "events": [
+          {"event_id": "c1-roof", "sequence": 1, "actor_id": "c1", "action": "用芦苇搭屋顶", "consequence": "风暴中散架", "evidence": "合成转写 C1-01"},
+          {"event_id": "c2-wall", "sequence": 2, "actor_id": "c2", "action": "用黏土砌墙", "consequence": "雨水冲垮", "evidence": "合成转写 C1-02"},
+          {"event_id": "c3-stone", "sequence": 3, "actor_id": "c3", "action": "用石块垒屋", "consequence": "众人躲过暴雨", "evidence": "合成转写 C1-03"}
+        ]
+      },
+      {
+        "story_id": "three-travelers-inland",
+        "revision": 1,
+        "title": "内陆转写：三兄弟与石屋",
+        "tradition": "inland_transcript",
+        "source": {"reference": "本地合成口述转写：内陆讲述者乙", "kind": "local_synthetic"},
+        "characters": [
+          {"character_id": "x1", "name": "长兄", "sibling_order": 1},
+          {"character_id": "x2", "name": "次兄", "sibling_order": 2},
+          {"character_id": "x3", "name": "幼弟", "sibling_order": 3}
+        ],
+        "events": [
+          {"event_id": "x1-roof", "sequence": 1, "actor_id": "x1", "action": "编草顶", "consequence": "被风掀翻", "evidence": "合成转写 I-01"},
+          {"event_id": "x2-wall", "sequence": 2, "actor_id": "x2", "action": "夯土墙", "consequence": "墙基渗水", "evidence": "合成转写 I-02"},
+          {"event_id": "x3-stone", "sequence": 3, "actor_id": "x3", "action": "寻来大石", "consequence": "一家人得救", "evidence": "合成转写 I-03"}
+        ]
+      },
+      {
+        "story_id": "three-travelers-harbor",
+        "revision": 1,
+        "title": "港口译本：石屋故事",
+        "tradition": "harbor_copy",
+        "source": {"reference": "本地合成译本：港口抄手丙", "kind": "local_synthetic"},
+        "characters": [
+          {"character_id": "h1", "name": "阿大", "sibling_order": 1},
+          {"character_id": "h2", "name": "阿二", "sibling_order": 2},
+          {"character_id": "h3", "name": "小弟", "sibling_order": 3}
+        ],
+        "events": [
+          {"event_id": "h1-roof", "sequence": 1, "actor_id": "h1", "action": "覆茅草", "consequence": "风雨摧毁", "evidence": "合成转写 H-01"},
+          {"event_id": "h2-wall", "sequence": 2, "actor_id": "h2", "action": "砌土坯", "consequence": "墙体崩塌", "evidence": "合成转写 H-02"},
+          {"event_id": "h3-stone", "sequence": 3, "actor_id": "h3", "action": "砌石墙", "consequence": "众人避雨", "evidence": "合成转写 H-03"}
+        ]
+      },
+      {
+        "story_id": "two-names-one-house",
+        "revision": 1,
+        "title": "同名冲突案例：一间屋里的两个阿甲",
+        "tradition": "conflict_copy",
+        "source": {"reference": "本地合成冲突案例：同名角色", "kind": "local_synthetic"},
+        "characters": [
+          {"character_id": "q1", "name": "阿甲", "sibling_order": 1},
+          {"character_id": "q2", "name": "阿甲", "sibling_order": 2},
+          {"character_id": "q3", "name": "少年", "sibling_order": 3}
+        ],
+        "events": [
+          {"event_id": "q1-door", "sequence": 1, "actor_id": "q1", "action": "关上木门", "consequence": "众人被隔在外", "evidence": "合成转写 Q-01"},
+          {"event_id": "q2-rope", "sequence": 2, "actor_id": "q2", "action": "放下绳索", "consequence": "众人翻入院内", "evidence": "合成转写 Q-02"},
+          {"event_id": "q3-call", "sequence": 3, "actor_id": "q3", "action": "呼喊邻里", "consequence": "共同修好院墙", "evidence": "合成转写 Q-03"}
+        ]
+      },
+      {
+        "story_id": "two-names-one-house",
+        "revision": 2,
+        "title": "同名冲突案例：修订重导（称谓澄清）",
+        "tradition": "conflict_copy",
+        "source": {"reference": "本地合成冲突案例：修订重导", "kind": "local_synthetic"},
+        "characters": [
+          {"character_id": "q1", "name": "阿甲（守门人）", "sibling_order": 1},
+          {"character_id": "q2", "name": "阿甲（孩童）", "sibling_order": 2},
+          {"character_id": "q3", "name": "少年", "sibling_order": 3}
+        ],
+        "events": [
+          {"event_id": "q1-door", "sequence": 1, "actor_id": "q1", "action": "关上木门", "consequence": "众人被隔在外", "evidence": "合成转写 Q2-01"},
+          {"event_id": "q2-rope", "sequence": 2, "actor_id": "q2", "action": "放下绳索", "consequence": "众人翻入院内", "evidence": "合成转写 Q2-02"},
+          {"event_id": "q3-call", "sequence": 3, "actor_id": "q3", "action": "呼喊邻里", "consequence": "共同修好院墙", "evidence": "合成转写 Q2-03"}
+        ]
+      }
+    ]
+  },
+  "aliases": [
+    {
+      "alias_id": "alias-coast-a",
+      "tradition": "coastal_copy",
+      "raw_name": "阿甲",
+      "canonical_id": "eldest-sibling",
+      "canonical_name": "长兄",
+      "rationale": "海岸抄本的角色顺序与内陆转写一致，第一位同指长兄。",
+      "created_by": "editor-lin"
+    },
+    {
+      "alias_id": "alias-coast-b",
+      "tradition": "coastal_copy",
+      "raw_name": "阿乙",
+      "canonical_id": "middle-sibling",
+      "canonical_name": "次兄",
+      "rationale": "事件二与内陆转写同位置对应。",
+      "created_by": "editor-lin"
+    },
+    {
+      "alias_id": "alias-coast-c",
+      "tradition": "coastal_copy",
+      "raw_name": "阿丙",
+      "canonical_id": "youngest-sibling",
+      "canonical_name": "幼弟",
+      "rationale": "末位角色以石屋救人，对应幼弟。",
+      "created_by": "editor-lin"
+    },
+    {
+      "alias_id": "alias-harbor-a",
+      "tradition": "harbor_copy",
+      "raw_name": "阿大",
+      "canonical_id": "eldest-sibling",
+      "canonical_name": "长兄",
+      "rationale": "港口译本的称谓按排行对译。",
+      "created_by": "editor-wu"
+    },
+    {
+      "alias_id": "alias-harbor-b",
+      "tradition": "harbor_copy",
+      "raw_name": "阿二",
+      "canonical_id": "middle-sibling",
+      "canonical_name": "次兄",
+      "rationale": "港口译本的称谓按排行对译。",
+      "created_by": "editor-wu"
+    },
+    {
+      "alias_id": "alias-harbor-c",
+      "tradition": "harbor_copy",
+      "raw_name": "小弟",
+      "canonical_id": "youngest-sibling",
+      "canonical_name": "幼弟",
+      "rationale": "港口译本的称谓按排行对译。",
+      "created_by": "editor-wu"
+    }
+  ],
+  "decisions": [
+    {"decision_id": "d-coast-a", "story_id": "three-travelers-coast", "story_revision": 1, "annotator": "reader-a", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["c1-roof", "c2-wall", "c3-stone"]},
+    {"decision_id": "d-coast-b", "story_id": "three-travelers-coast", "story_revision": 1, "annotator": "reader-b", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["c1-roof", "c3-stone"]},
+    {"decision_id": "d-inland-a", "story_id": "three-travelers-inland", "story_revision": 1, "annotator": "reader-a", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["x1-roof", "x2-wall", "x3-stone"]},
+    {"decision_id": "d-inland-b", "story_id": "three-travelers-inland", "story_revision": 1, "annotator": "reader-b", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["x1-roof", "x3-stone"]},
+    {"decision_id": "d-harbor-a", "story_id": "three-travelers-harbor", "story_revision": 1, "annotator": "reader-a", "sequence": 1, "pattern": "harm", "youngest_outcome": "wins", "evidence_event_ids": ["h1-roof", "h3-stone"]},
+    {"decision_id": "d-harbor-b", "story_id": "three-travelers-harbor", "story_revision": 1, "annotator": "reader-b", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["h1-roof", "h2-wall", "h3-stone"]},
+    {"decision_id": "d-conflict-a", "story_id": "two-names-one-house", "story_revision": 1, "annotator": "reader-a", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["q1-door", "q3-call"]},
+    {"decision_id": "d-conflict-b", "story_id": "two-names-one-house", "story_revision": 1, "annotator": "reader-b", "sequence": 1, "pattern": "parallel", "youngest_outcome": "wins", "evidence_event_ids": ["q2-rope", "q3-call"]}
+  ],
+  "tradition": null,
+  "minimum_reviewers": 2,
+  "revocations": [
+    {
+      "alias_id": "alias-harbor-c",
+      "revoked_by": "editor-lin",
+      "revocation_reason": "港口译本第三位在复校本中被判为邻人而非幼弟，先撤销该映射待复核。"
+    }
+  ],
+  "replay": true
+}

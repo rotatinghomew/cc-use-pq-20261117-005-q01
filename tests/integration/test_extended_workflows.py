@@ -226,5 +226,105 @@ class AdjudicationLifecycleTests(AppCase, unittest.TestCase):
         self.assertIn(report["report_id"], markdown)
 
 
+class AliasWorkflowCliTests(unittest.TestCase):
+    def test_alias_cli_commands_keep_history_and_replay_a_report(self):
+        import contextlib
+        import io
+        import json
+        import tempfile
+        from pathlib import Path
+        from story_patterns.cli import main
+
+        fixture_path = Path(__file__).resolve().parents[2] / "fixtures" / "multitranslation.json"
+        content = json.loads(fixture_path.read_text(encoding="utf-8"))
+        self.assertTrue(all(story_data["source"]["kind"] == "local_synthetic"
+                            for story_data in content["batch"]["stories"]))
+        with tempfile.TemporaryDirectory() as directory:
+            database = str(Path(directory) / "aliases.sqlite3")
+
+            def run(*arguments):
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    code = main([*arguments, "--database", database])
+                self.assertEqual(code, 0, stderr.getvalue())
+                return json.loads(stdout.getvalue())
+
+            story_file = Path(directory) / "stories.json"
+            story_file.write_text(json.dumps(content["batch"]["stories"], ensure_ascii=False),
+                                  encoding="utf-8")
+            run("import", "--file", str(story_file), "--format", "json",
+                "--batch-id", content["batch"]["batch_id"])
+            listing = run("alias-list")
+            self.assertEqual(listing["active_mapping_count"], 0)
+
+            alias_file = Path(directory) / "alias.json"
+            alias_file.write_text(json.dumps({
+                "alias_id": "coast-elder", "tradition": "coastal_copy", "raw_name": "阿甲",
+                "canonical_id": "elder", "canonical_name": "长兄",
+                "rationale": "合成对照：同一事件位置。", "created_by": "editor-test",
+            }, ensure_ascii=False), encoding="utf-8")
+            run("alias-add", "--file", str(alias_file))
+            report = run("report")
+            self.assertEqual(report["character_view"]["denominators"]["aliased_character_entries"], 1)
+
+            revoke_file = Path(directory) / "revoke.json"
+            revoke_file.write_text(json.dumps({
+                "alias_id": "coast-elder", "revoked_by": "editor-test",
+                "revocation_reason": "合成复核撤回。",
+            }, ensure_ascii=False), encoding="utf-8")
+            run("alias-revoke", "--file", str(revoke_file))
+            history = run("alias-list")
+            self.assertEqual(history["active_mapping_count"], 0)
+            self.assertEqual(history["revoked_mapping_count"], 1)
+            self.assertEqual(history["aliases"][0]["raw_name"], "阿甲")
+
+            replay = run("replay", "--report-id", report["report_id"])
+            self.assertTrue(replay["reproduces_stored_report"])
+            self.assertTrue(replay["policy_changed"])
+            self.assertEqual(replay["policy_differences"]["removed_mappings"][0]["raw_name"], "阿甲")
+            self.assertEqual(run("audit")["issue_count"], 0)
+
+
+    def test_demo_fixture_exercises_merges_collisions_revisions_and_revocation(self):
+        import contextlib
+        import io
+        import json
+        import tempfile
+        from pathlib import Path
+        from story_patterns.cli import main
+
+        fixture_path = Path(__file__).resolve().parents[2] / "fixtures" / "multitranslation.json"
+        with tempfile.TemporaryDirectory() as directory:
+            database = str(Path(directory) / "demo.sqlite3")
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = main(["demo", "--database", database, "--fixture", str(fixture_path)])
+        self.assertEqual(code, 0)
+        output = json.loads(stdout.getvalue())
+        view = output["report"]["character_view"]
+        self.assertEqual(view["denominators"]["aliased_character_entries"], 6)
+        self.assertEqual(view["denominators"]["collision_story_revisions"], 1)
+        self.assertEqual(view["collisions"][0]["kind"], "ambiguous_raw_name")
+        youngest = next(row for row in view["characters"]
+                        if row["analysis_id"] == "canonical:youngest-sibling")
+        self.assertEqual(sorted(youngest["raw_names"]), ["小弟", "阿丙"])
+        revision_names = {
+            (story_row["revision"], character["raw_name"])
+            for story_row in view["stories"]
+            if story_row["story_id"] == "two-names-one-house"
+            for character in story_row["characters"]
+        }
+        self.assertIn((1, "阿甲"), revision_names)
+        self.assertIn((2, "阿甲（守门人）"), revision_names)
+        after = output["report_after_revocation"]["character_view"]
+        self.assertEqual(after["denominators"]["aliased_character_entries"], 5)
+        replay = output["replay"]
+        self.assertTrue(replay["reproduces_stored_report"])
+        self.assertTrue(replay["decisions_unchanged"])
+        self.assertEqual(replay["policy_differences"]["removed_mappings"],
+                         [{"tradition": "harbor_copy", "raw_name": "小弟",
+                           "canonical_id": "youngest-sibling", "alias_id": "alias-harbor-c"}])
+
+
 if __name__ == "__main__":
     unittest.main()

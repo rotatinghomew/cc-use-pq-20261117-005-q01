@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from story_patterns.analysis.characters import compare_canonical_characters, restrict_policy
 from story_patterns.analysis.report import build_report
 
 
-def compare_traditions(stories: list[dict], decisions: dict, minimum: int, adjudications: dict | None = None) -> dict:
+def compare_traditions(stories: list[dict], decisions: dict, minimum: int,
+                       adjudications: dict | None = None, policy: dict | None = None) -> dict:
     grouped = defaultdict(list)
     for story in stories:
         grouped[story["tradition"]].append(story)
@@ -15,8 +17,9 @@ def compare_traditions(stories: list[dict], decisions: dict, minimum: int, adjud
         identities = {(item["story_id"], item["revision"]) for item in cohort}
         cohort_decisions = {identity: decisions.get(identity, []) for identity in identities}
         cohort_adjudications = {identity: adjudications.get(identity) for identity in identities} if adjudications else None
+        cohort_policy = (None if policy is None else restrict_policy(policy, cohort))
         summary = build_report(cohort, cohort_decisions, tradition, minimum,
-                               adjudications=cohort_adjudications)
+                               adjudications=cohort_adjudications, policy=cohort_policy)
         pattern_denominator = summary["population"]["pattern_consensus"]
         outcome_denominator = summary["population"]["outcome_consensus"]
         final_pattern_denominator = sum(summary["final_pattern_counts"].values())
@@ -44,10 +47,29 @@ def compare_traditions(stories: list[dict], decisions: dict, minimum: int, adjud
                 key: count / final_outcome_denominator
                 for key, count in summary["final_outcome_counts"].items()
             } if final_outcome_denominator else {},
+            "character_denominators": summary["character_view"]["denominators"],
+            "character_policy_id": summary["character_view"]["policy_id"],
+            "unmapped_character_names": sorted(
+                [[tradition, raw_name] for tradition, raw_name in {
+                    (item["tradition"], item["raw_name"])
+                    for item in summary["character_view"]["unmapped"]
+                }]
+            ),
+            "character_collisions": summary["character_view"]["collisions"],
         })
+    all_view_characters = compare_canonical_characters(
+        build_report(stories, decisions, None, minimum, adjudications=adjudications,
+                     policy=policy)["character_view"]
+    )
     return {
         "method": "descriptive comparison of independently filtered cohorts",
         "minimum_reviewers": minimum,
         "groups": rows,
-        "interpretation_limit": "Rates use consensus labels only; coverage and denominators must be reviewed before comparison.",
+        "canonical_characters": all_view_characters,
+        "character_policy_id": None if policy is None else policy["policy_id"],
+        "interpretation_limit": (
+            "Rates use consensus labels only; coverage and denominators must be reviewed before "
+            "comparison. Character rows describe only story revisions whose raw names resolve "
+            "through the frozen alias policy."
+        ),
     }

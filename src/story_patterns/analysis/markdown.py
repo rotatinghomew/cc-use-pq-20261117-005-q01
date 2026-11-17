@@ -36,6 +36,41 @@ def render_report(report: dict) -> str:
     coverage = report["coverage"]["pattern"]
     lines.extend(_table([{"status": key, "count": value} for key, value in coverage.items()],
                         [("status", "Pattern review status"), ("count", "Stories")]))
+    view = report.get("character_view")
+    if view is not None:
+        denominators = view["denominators"]
+        lines.extend([
+            "", "## Character names under the analysis policy", "",
+            "Raw story names and reader decisions are unchanged. The counts below apply the "
+            "frozen alias policy recorded in provenance.", "",
+            f"- Policy: `{view['policy_id']}`",
+            f"- Raw character entries: {denominators['raw_character_entries']}",
+            f"- Resolved through aliases: {denominators['aliased_character_entries']}",
+            f"- Left unmapped: {denominators['unmapped_character_entries']}",
+            f"- Distinct analysis characters: {denominators['distinct_analysis_characters']}",
+            f"- Story revisions with name collisions: {denominators['collision_story_revisions']}", "",
+        ])
+        rows = [{
+            "character": row["display_name"],
+            "basis": "alias" if row["basis"] == "alias" else "raw (unmapped)",
+            "raw_names": ", ".join(row["raw_names"]),
+            "traditions": ", ".join(row["traditions"]),
+            "revisions": row["story_revisions"],
+            "events": row["events"],
+            "cited": row["cited_events"],
+        } for row in view["characters"]]
+        lines.extend(_table(rows, [("character", "Analysis character"), ("basis", "Basis"),
+                                   ("raw_names", "Raw names"),
+                                   ("traditions", "Traditions"), ("revisions", "Story revisions"),
+                                   ("events", "Events"), ("cited", "Cited events")]))
+        if view["collisions"]:
+            lines.extend(["", "### Unresolved name collisions", "",
+                          "These revisions are excluded from canonical character aggregates until "
+                          "reviewers resolve them.", ""])
+            lines.extend(_table(view["collisions"],
+                                [("story_id", "Story"), ("revision", "Revision"),
+                                 ("kind", "Kind"), ("display_name", "Character"),
+                                 ("character_ids", "Raw character IDs")]))
     lines.extend(["", "## Provenance", "", "Story revisions and decision IDs used:", "",
                   "```json", json.dumps(report["provenance"], ensure_ascii=False, indent=2), "```", ""])
     return "\n".join(lines)

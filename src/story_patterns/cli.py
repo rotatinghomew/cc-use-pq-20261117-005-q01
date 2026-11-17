@@ -69,6 +69,20 @@ def parser() -> argparse.ArgumentParser:
     search.add_argument("--source-kind", choices=("book", "oral_record", "local_synthetic"))
     search.add_argument("--sibling-order", type=int)
     search.add_argument("--revision-policy", choices=("all", "latest"), default="all")
+    alias_add = commands.add_parser("alias-add", help="record one character alias mapping")
+    alias_add.add_argument("--database", required=True)
+    alias_add.add_argument("--file", required=True)
+    alias_revoke = commands.add_parser("alias-revoke", help="retire an alias mapping without deleting it")
+    alias_revoke.add_argument("--database", required=True)
+    alias_revoke.add_argument("--file", required=True)
+    alias_list = commands.add_parser("alias-list", help="show alias history and the active policy")
+    alias_list.add_argument("--database", required=True)
+    alias_list.add_argument("--tradition")
+    alias_list.add_argument("--active-only", action="store_true")
+    replay = commands.add_parser("replay", help="recompute a stored report from frozen inputs")
+    replay.add_argument("--database", required=True)
+    replay.add_argument("--report-id", required=True)
+    replay.add_argument("--policy-id")
     demo = commands.add_parser("demo", help="replay the bundled synthetic workflow")
     demo.add_argument("--database", required=True)
     demo.add_argument("--fixture", required=True)
@@ -121,11 +135,31 @@ def execute(arguments: argparse.Namespace) -> dict:
         return app.search_stories(text=arguments.text, tradition=arguments.tradition,
                                   source_kind=arguments.source_kind, sibling_order=arguments.sibling_order,
                                   revision_policy=arguments.revision_policy)
+    if arguments.command == "alias-add":
+        return app.record_character_alias(read_json(arguments.file))
+    if arguments.command == "alias-revoke":
+        return app.revoke_character_alias(read_json(arguments.file))
+    if arguments.command == "alias-list":
+        result = app.character_aliases(arguments.tradition)
+        if arguments.active_only:
+            result["aliases"] = [item for item in result["aliases"] if item["status"] == "active"]
+        return result
+    if arguments.command == "replay":
+        return app.replay_report(arguments.report_id, arguments.policy_id)
     fixture = read_json(arguments.fixture)
     imported = app.import_batch(fixture["batch"])
+    aliases = [app.record_character_alias(item) for item in fixture.get("aliases", [])]
     decisions = [app.record_decision(item) for item in fixture["decisions"]]
     report = app.create_report(fixture.get("tradition"), fixture.get("minimum_reviewers", 2))
-    return {"import": imported, "decisions_recorded": len(decisions), "report": report}
+    result = {"import": imported, "alias_records": len(aliases),
+              "decisions_recorded": len(decisions), "report": report}
+    if fixture.get("revocations"):
+        result["revocations"] = [app.revoke_character_alias(item) for item in fixture["revocations"]]
+        result["report_after_revocation"] = app.create_report(
+            fixture.get("tradition"), fixture.get("minimum_reviewers", 2))
+    if fixture.get("replay"):
+        result["replay"] = app.replay_report(result["report"]["report_id"])
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:

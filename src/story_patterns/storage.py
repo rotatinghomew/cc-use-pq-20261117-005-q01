@@ -65,6 +65,29 @@ CREATE TABLE IF NOT EXISTS reports (
     request_digest TEXT NOT NULL,
     document TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS canonical_characters (
+    canonical_id TEXT PRIMARY KEY,
+    canonical_name TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    UNIQUE(canonical_name)
+);
+CREATE TABLE IF NOT EXISTS character_aliases (
+    alias_id TEXT PRIMARY KEY,
+    tradition TEXT NOT NULL,
+    raw_name TEXT NOT NULL,
+    canonical_id TEXT NOT NULL REFERENCES canonical_characters(canonical_id) ON DELETE RESTRICT,
+    rationale TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('active', 'revoked')),
+    revoked_by TEXT,
+    revocation_reason TEXT,
+    digest TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS aliases_by_tradition ON character_aliases(tradition, raw_name, alias_id);
+CREATE INDEX IF NOT EXISTS aliases_by_canonical ON character_aliases(canonical_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS one_active_alias_per_name
+    ON character_aliases(tradition, raw_name) WHERE status = 'active';
 """
 
 
@@ -168,47 +191,65 @@ class StoryStore:
     def analysis_snapshot(self, tradition: str | None) -> tuple[list[dict], dict, dict, dict]:
         with self.read_connection() as connection:
             connection.execute("BEGIN")
-            if tradition is None:
-                rows = connection.execute(
-                    "SELECT document FROM stories ORDER BY tradition, story_id, revision"
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    "SELECT document FROM stories WHERE tradition=? ORDER BY story_id, revision", (tradition,)
-                ).fetchall()
-            stories = [json.loads(row["document"]) for row in rows]
-            identities = [(item["story_id"], item["revision"]) for item in stories]
-            decisions = {}
-            adjudications = {}
-            for story_id, revision in identities:
-                latest = connection.execute(
-                    "SELECT d.* FROM decisions d JOIN ("
-                    "SELECT annotator, MAX(sequence) AS latest FROM decisions "
-                    "WHERE story_id=? AND story_revision=? GROUP BY annotator"
-                    ") newest ON d.annotator=newest.annotator AND d.sequence=newest.latest "
-                    "WHERE d.story_id=? AND d.story_revision=? ORDER BY d.annotator",
-                    (story_id, revision, story_id, revision),
-                ).fetchall()
-                decisions[(story_id, revision)] = [
-                    dict(row) | {"evidence_event_ids": json.loads(row["evidence_event_ids"])} for row in latest
-                ]
-                adjudication = connection.execute(
-                    "SELECT * FROM adjudications WHERE story_id=? AND story_revision=? "
-                    "ORDER BY sequence DESC LIMIT 1", (story_id, revision)
-                ).fetchone()
-                adjudications[(story_id, revision)] = (
-                    dict(adjudication) | {"evidence_event_ids": json.loads(adjudication["evidence_event_ids"])}
-                    if adjudication else None
-                )
-            origins = {identity: [] for identity in identities}
-            if identities:
-                rows = connection.execute(
-                    "SELECT batch_id, story_id, revision FROM batch_stories ORDER BY batch_id"
-                ).fetchall()
-                for row in rows:
-                    identity = (row["story_id"], row["revision"])
-                    if identity in origins:
-                        origins[identity].append(row["batch_id"])
+            stories, decisions, origins, adjudications = self._analysis_rows(connection, tradition)
+        return stories, decisions, origins, adjudications
+
+    def analysis_snapshot_with_aliases(self, tradition: str | None) -> tuple[list[dict], dict, dict, dict,
+                                                                           list[dict], list[dict]]:
+        with self.read_connection() as connection:
+            connection.execute("BEGIN")
+            stories, decisions, origins, adjudications = self._analysis_rows(connection, tradition)
+            canonicals = [dict(row) for row in connection.execute(
+                "SELECT canonical_id, canonical_name, created_by FROM canonical_characters "
+                "ORDER BY canonical_id"
+            )]
+            aliases = [dict(row) for row in connection.execute(
+                "SELECT * FROM character_aliases ORDER BY tradition, raw_name, alias_id"
+            )]
+        return stories, decisions, origins, adjudications, canonicals, aliases
+
+    def _analysis_rows(self, connection, tradition: str | None):
+        if tradition is None:
+            rows = connection.execute(
+                "SELECT document FROM stories ORDER BY tradition, story_id, revision"
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT document FROM stories WHERE tradition=? ORDER BY story_id, revision", (tradition,)
+            ).fetchall()
+        stories = [json.loads(row["document"]) for row in rows]
+        identities = [(item["story_id"], item["revision"]) for item in stories]
+        decisions = {}
+        adjudications = {}
+        for story_id, revision in identities:
+            latest = connection.execute(
+                "SELECT d.* FROM decisions d JOIN ("
+                "SELECT annotator, MAX(sequence) AS latest FROM decisions "
+                "WHERE story_id=? AND story_revision=? GROUP BY annotator"
+                ") newest ON d.annotator=newest.annotator AND d.sequence=newest.latest "
+                "WHERE d.story_id=? AND d.story_revision=? ORDER BY d.annotator",
+                (story_id, revision, story_id, revision),
+            ).fetchall()
+            decisions[(story_id, revision)] = [
+                dict(row) | {"evidence_event_ids": json.loads(row["evidence_event_ids"])} for row in latest
+            ]
+            adjudication = connection.execute(
+                "SELECT * FROM adjudications WHERE story_id=? AND story_revision=? "
+                "ORDER BY sequence DESC LIMIT 1", (story_id, revision)
+            ).fetchone()
+            adjudications[(story_id, revision)] = (
+                dict(adjudication) | {"evidence_event_ids": json.loads(adjudication["evidence_event_ids"])}
+                if adjudication else None
+            )
+        origins = {identity: [] for identity in identities}
+        if identities:
+            rows = connection.execute(
+                "SELECT batch_id, story_id, revision FROM batch_stories ORDER BY batch_id"
+            ).fetchall()
+            for row in rows:
+                identity = (row["story_id"], row["revision"])
+                if identity in origins:
+                    origins[identity].append(row["batch_id"])
         return stories, decisions, origins, adjudications
 
     def catalog_manifest(self) -> tuple[list[dict], list[dict]]:
@@ -234,12 +275,83 @@ class StoryStore:
                 "adjudications": [dict(row) for row in connection.execute(
                     "SELECT * FROM adjudications ORDER BY adjudication_id")],
                 "reports": [dict(row) for row in connection.execute("SELECT * FROM reports ORDER BY report_id")],
+                "canonical_characters": [dict(row) for row in connection.execute(
+                    "SELECT * FROM canonical_characters ORDER BY canonical_id")],
+                "character_aliases": [dict(row) for row in connection.execute(
+                    "SELECT * FROM character_aliases ORDER BY alias_id")],
             }
+
+    def decision_records(self, decision_ids: list[str]) -> dict[str, dict]:
+        if not decision_ids:
+            return {}
+        placeholders = ",".join("?" for _ in decision_ids)
+        with self.read_connection() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM decisions WHERE decision_id IN ({placeholders})", decision_ids
+            ).fetchall()
+        return {row["decision_id"]: dict(row) | {"evidence_event_ids": json.loads(row["evidence_event_ids"])}
+                for row in rows}
+
+    def adjudication_records(self, adjudication_ids: list[str]) -> dict[str, dict]:
+        if not adjudication_ids:
+            return {}
+        placeholders = ",".join("?" for _ in adjudication_ids)
+        with self.read_connection() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM adjudications WHERE adjudication_id IN ({placeholders})", adjudication_ids
+            ).fetchall()
+        return {row["adjudication_id"]: dict(row) | {"evidence_event_ids": json.loads(row["evidence_event_ids"])}
+                for row in rows}
+
+    def latest_decision_ids(self, identities: list[tuple[str, int]]) -> set[str]:
+        result = set()
+        for story_id, revision in identities:
+            result.update(item["decision_id"] for item in self.latest_decisions(story_id, revision))
+        return result
+
+    def latest_adjudication_ids(self, identities: list[tuple[str, int]]) -> set[str]:
+        result = set()
+        for story_id, revision in identities:
+            with self.read_connection() as connection:
+                row = connection.execute(
+                    "SELECT adjudication_id FROM adjudications WHERE story_id=? AND story_revision=? "
+                    "ORDER BY sequence DESC LIMIT 1", (story_id, revision)
+                ).fetchone()
+            if row:
+                result.add(row["adjudication_id"])
+        return result
 
     def report_document(self, report_id: str) -> dict | None:
         with self.read_connection() as connection:
             row = connection.execute("SELECT document FROM reports WHERE report_id=?", (report_id,)).fetchone()
         return json.loads(row["document"]) if row else None
+
+    def character_alias_snapshot(self, tradition: str | None = None) -> tuple[list[dict], list[dict]]:
+        with self.read_connection() as connection:
+            canonicals = connection.execute(
+                "SELECT canonical_id, canonical_name, created_by FROM canonical_characters "
+                "ORDER BY canonical_id"
+            ).fetchall()
+            if tradition is None:
+                aliases = connection.execute(
+                    "SELECT * FROM character_aliases ORDER BY tradition, raw_name, alias_id"
+                ).fetchall()
+            else:
+                aliases = connection.execute(
+                    "SELECT * FROM character_aliases WHERE tradition=? ORDER BY raw_name, alias_id",
+                    (tradition,),
+                ).fetchall()
+        return [dict(row) for row in canonicals], [dict(row) for row in aliases]
+
+    def character_alias_history(self, tradition: str | None = None,
+                                include_revoked: bool = True) -> tuple[list[dict], list[dict]]:
+        canonicals, aliases = self.character_alias_snapshot(tradition)
+        if tradition is not None:
+            referenced = {item["canonical_id"] for item in aliases}
+            canonicals = [item for item in canonicals if item["canonical_id"] in referenced]
+        if not include_revoked:
+            aliases = [item for item in aliases if item["status"] == "active"]
+        return canonicals, aliases
 
     def integrity_issues(self) -> list[str]:
         with self.read_connection() as connection:

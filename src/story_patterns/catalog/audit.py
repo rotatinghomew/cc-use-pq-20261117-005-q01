@@ -77,6 +77,8 @@ def audit_catalog(snapshot: dict) -> dict:
     story_keys = {f"{story_id}@{revision}" for story_id, revision in stories}
     decision_ids = {row["decision_id"] for row in snapshot["decisions"]}
     adjudication_ids = {row["adjudication_id"] for row in snapshot["adjudications"]}
+    aliases_checked, alias_issues = _audit_aliases(snapshot)
+    issues.extend(alias_issues)
     for row in snapshot["reports"]:
         try:
             document = json.loads(row["document"])
@@ -94,6 +96,19 @@ def audit_catalog(snapshot: dict) -> dict:
             for identity, batch_ids in provenance.get("batch_ids_by_story", {}).items():
                 if identity not in story_keys or not set(batch_ids).issubset(batch_rows):
                     issues.append(_issue("report", row["report_id"], "references missing batch provenance"))
+            policy = provenance.get("character_policy")
+            if policy is not None:
+                from story_patterns.catalog.aliases import policy_snapshot
+                recomputed = policy_snapshot(policy.get("canonicals", []), [
+                    dict(item) | {"status": "active"} for item in policy.get("mappings", [])
+                ])
+                if recomputed["policy_id"] != policy.get("policy_id"):
+                    issues.append(_issue("report", row["report_id"],
+                                         "frozen character policy does not match its identifier"))
+                if (document["criteria"].get("character_policy_id")
+                        != provenance.get("character_policy", {}).get("policy_id")):
+                    issues.append(_issue("report", row["report_id"],
+                                         "criteria and provenance disagree on character policy"))
         except (json.JSONDecodeError, KeyError, TypeError) as error:
             issues.append(_issue("report", row["report_id"], f"invalid report document: {error}"))
     issues.sort(key=lambda item: (item["scope"], str(item["identity"]), item["problem"]))
@@ -101,7 +116,37 @@ def audit_catalog(snapshot: dict) -> dict:
             "batches_checked": len(snapshot["batches"]), "decisions_checked": len(snapshot["decisions"]),
             "batch_links_checked": len(snapshot["batch_stories"]),
             "adjudications_checked": len(snapshot["adjudications"]), "reports_checked": len(snapshot["reports"]),
+            "aliases_checked": aliases_checked,
             "issue_count": len(issues), "issues": issues}
+
+
+def _audit_aliases(snapshot: dict) -> tuple[int, list[dict]]:
+    from story_patterns.catalog.aliases import alias_payload, canonical_payload
+
+    issues = []
+    canonicals = {}
+    for row in snapshot.get("canonical_characters", []):
+        canonical_id = row["canonical_id"]
+        payload = canonical_payload(canonical_id, row["canonical_name"], row["created_by"])
+        if digest_json(payload) != row["digest"]:
+            issues.append(_issue("canonical_character", canonical_id, "stored digest does not match content"))
+        canonicals[canonical_id] = row
+    active_names = {}
+    for row in snapshot.get("character_aliases", []):
+        alias_id = row["alias_id"]
+        if digest_json(alias_payload(row)) != row["digest"]:
+            issues.append(_issue("character_alias", alias_id, "stored digest does not match content"))
+        if row["canonical_id"] not in canonicals:
+            issues.append(_issue("character_alias", alias_id, "references missing canonical character"))
+        if row["status"] == "active":
+            key = (row["tradition"], row["raw_name"])
+            if key in active_names:
+                issues.append(_issue("character_alias", alias_id,
+                                     f"duplicates an active mapping for {key[0]}/{key[1]}"))
+            active_names[key] = alias_id
+        elif row["status"] == "revoked" and not row["revoked_by"]:
+            issues.append(_issue("character_alias", alias_id, "revocation has no attributed reviewer"))
+    return len(snapshot.get("character_aliases", [])), issues
 
 
 def grouped_by_identity(grouped: dict) -> dict:

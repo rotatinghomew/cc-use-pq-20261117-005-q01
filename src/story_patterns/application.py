@@ -1,4 +1,5 @@
 from story_patterns.analysis.report import ReportService
+from story_patterns.catalog.aliases import AliasService
 from story_patterns.catalog.service import CatalogService
 from story_patterns.review.service import ReviewService
 from story_patterns.storage import StoryStore
@@ -12,6 +13,7 @@ class StoryPatternApplication:
         self.catalog = CatalogService(self.store)
         self.review = ReviewService(self.store)
         self.reports = ReportService(self.store)
+        self.aliases = AliasService(self.store)
 
     def import_batch(self, batch: dict) -> dict:
         return self.catalog.import_batch(batch)
@@ -51,3 +53,15 @@ class StoryPatternApplication:
 
     def audit(self) -> dict:
         return self.catalog.audit()
+
+    def record_character_alias(self, mapping: dict) -> dict:
+        return self.aliases.record(mapping)
+
+    def revoke_character_alias(self, record: dict) -> dict:
+        return self.aliases.revoke(record)
+
+    def character_aliases(self, tradition: str | None = None) -> dict:
+        return self.aliases.listing(tradition)
+
+    def replay_report(self, report_id: str, policy_id: str | None = None) -> dict:
+        return self.reports.replay(report_id, policy_id)
